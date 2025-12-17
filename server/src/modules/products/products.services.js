@@ -1,29 +1,37 @@
-const pool = require("../../libs/db");
+const prisma = require("../../libs/prisma");
 
-// получить все продукты
+/**
+ * Получить все продукты
+ */
 async function getAll() {
-  const { rows } = await pool.query(
-    "SELECT id, name, price FROM products ORDER BY id ASC"
-  );
-  return rows;
+  return prisma.products.findMany({
+    orderBy: {
+      id: "asc",
+    },
+  });
 }
 
-// получить продукт по id
+/**
+ * Получить продукт по id
+ */
 async function getById(id) {
-  const { rows } = await pool.query(
-    "SELECT id, name, price FROM products WHERE id = $1",
-    [id]
-  );
-  return rows[0];
+  return prisma.products.findUnique({
+    where: {
+      id: Number(id),
+    },
+  });
 }
 
-// создать продукт
-async function create({ name, price }) {
-  const { rows } = await pool.query(
-    "INSERT INTO products (name, price) VALUES ($1, $2) RETURNING id, name, price",
-    [name, price]
-  );
-  return rows[0];
+/**
+ * Создать продукт
+ */
+async function create({ title, price }) {
+  return prisma.products.create({
+    data: {
+      title,
+      price,
+    },
+  });
 }
 
 module.exports = {

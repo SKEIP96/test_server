@@ -3,9 +3,14 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "watch": "tsc -w",
+    "format": "prettier --write ."
   },
+  
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SKEIP96/test_server.git"
@@ -13,14 +18,19 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "bugs": {
     "url": "https://github.com/SKEIP96/test_server/issues"
   },
   "homepage": "https://github.com/SKEIP96/test_server#readme",
   "dependencies": {
+    "@prisma/adapter-pg": "^7.1.0",
+    "@prisma/client": "^7.1.0",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "nodemon": "^3.1.11",
     "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "prisma": "^7.1.0"
   }
 }
