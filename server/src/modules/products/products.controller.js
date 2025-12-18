@@ -1,4 +1,4 @@
-const productsService = require("./products.services");
+import * as productsService from "./products.services.js";
 
 /**
  * GET /products
@@ -41,8 +41,4 @@ async function create(req, res, next) {
   }
 }
 
-module.exports = {
-  getAll,
-  getById,
-  create,
-};
+export { getAll, getById, create };

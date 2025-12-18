@@ -4,50 +4,50 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-model OrderItem {
-  id        Int     @id @default(autoincrement())
-  orderId   Int
-  productId Int
-  quantity  Int     @default(1)
+model User {
+  id         Int      @id @default(autoincrement())
+  name       String
+  created_at DateTime @default(now())
 
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orders Order[]
 
-  @@map("order_items")
-}
-
-model Order {
-  id         Int         @id @default(autoincrement())
-  userId     Int
-  total      Decimal    @db.Decimal(10, 2)
-  createdAt  DateTime   @default(now()) @db.Timestamp(6)
-
-  items      OrderItem[]
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("orders")
+  @@map("users")
 }
 
 model Product {
-  id        Int         @id @default(autoincrement())
-  title     String      @db.VarChar(150)
-  price     Decimal     @db.Decimal(10, 2)
-  inStock   Int         @default(0)
+  id        Int     @id @default(autoincrement())
+  title     String
+  price     Decimal @db.Decimal(10, 2)
+  in_stock  Int     @default(0)
 
-  items     OrderItem[]
+  order_items OrderItem[]
 
   @@map("products")
 }
 
-model User {
-  id        Int       @id @default(autoincrement())
-  name      String    @db.VarChar(100)
-  email     String    @unique @db.VarChar(150)
-  createdAt DateTime  @default(now()) @db.Timestamp(6)
+model Order {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  created_at DateTime @default(now())
 
-  orders    Order[]
+  user        User        @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  order_items OrderItem[]
 
-  @@map("users")
+  @@map("orders")
+}
+
+model OrderItem {
+  id         Int @id @default(autoincrement())
+  order_id   Int
+  product_id Int
+  quantity   Int
+
+  order   Order   @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [product_id], references: [id], onDelete: Restrict)
+
+  @@unique([order_id, product_id])
+  @@map("order_items")
 }

@@ -1,17 +1,21 @@
-const ordersService = require("./orders.services");
+import { createOrder } from "./orders.services.js";
 
-/**
- * GET /orders
- */
-async function getAll(req, res, next) {
+export async function create(req, res) {
   try {
-    const orders = await ordersService.getAllOrders();
-    res.json(orders);
+    const { userId, items } = req.body;
+
+    if (!userId || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        message: "INVALID_REQUEST_DATA",
+      });
+    }
+
+    const order = await createOrder({ userId, items });
+
+    return res.status(201).json(order);
   } catch (error) {
-    next(error);
+    return res.status(400).json({
+      message: error.message,
+    });
   }
 }
-
-module.exports = {
-  getAll,
-};

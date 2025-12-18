@@ -1,15 +1,15 @@
-const express = require("express");
+import { Router } from "express";
 
-const productsRoutes = require("./src/modules/products/products.routes");
-const ordersRoutes = require("./src/modules/orders/orders.routes");
-const app = express();
+import productsRoutes from "./src/modules/products/products.routes.js";
+import ordersRoutes from "./src/modules/orders/orders.routes.js";
 
-app.use(express.json());
+const router = Router();
 
-app.get("/", (req, res) => {
+router.get("/", (req, res) => {
   res.send("Server is running");
 });
 
-app.use("/products", productsRoutes);
-app.use("/orders", ordersRoutes);
-module.exports = app;
+router.use("/products", productsRoutes);
+router.use("/orders", ordersRoutes);
+
+export default router;

@@ -1,10 +1,7 @@
-const prisma = require("../../libs/prisma");
+import { prisma } from "../../libs/prisma.js";
 
-/**
- * Получить все продукты
- */
 async function getAll() {
-  return prisma.products.findMany({
+  return prisma.product.findMany({
     orderBy: {
       id: "asc",
     },
@@ -15,18 +12,15 @@ async function getAll() {
  * Получить продукт по id
  */
 async function getById(id) {
-  return prisma.products.findUnique({
+  return prisma.product.findUnique({
     where: {
       id: Number(id),
     },
   });
 }
 
-/**
- * Создать продукт
- */
 async function create({ title, price }) {
-  return prisma.products.create({
+  return prisma.product.create({
     data: {
       title,
       price,
@@ -34,8 +28,5 @@ async function create({ title, price }) {
   });
 }
 
-module.exports = {
-  getAll,
-  getById,
-  create,
-};
+
+export { getAll, getById, create };
