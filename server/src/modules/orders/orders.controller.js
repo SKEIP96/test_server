@@ -1,9 +1,13 @@
 import { createOrder } from "./orders.services.js";
 
-export async function create(req, res) {
+/**
+ * POST /orders
+ */
+export async function create(req, res, next) {
   try {
     const { userId, items } = req.body;
 
+    // Базовая проверка запроса (структура)
     if (!userId || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
         message: "INVALID_REQUEST_DATA",
@@ -12,10 +16,9 @@ export async function create(req, res) {
 
     const order = await createOrder({ userId, items });
 
-    return res.status(201).json(order);
-  } catch (error) {
-    return res.status(400).json({
-      message: error.message,
-    });
+    res.status(201).json(order);
+  } catch (err) {
+    // ❗ ВСЕ ошибки уходим в error middleware
+    next(err);
   }
 }

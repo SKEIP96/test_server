@@ -1,13 +1,14 @@
 import prisma from "../../libs/prisma.js";
+import createError from "http-errors";
 
 /**
- * Создание заказа с позициями
+ * Создание заказа (транзакция)
  * @param {number} userId
- * @param {Array<{ productId: number, quantity: number }>} items
+ * @param {{ productId: number, quantity: number }[]} items
  */
 export async function createOrder({ userId, items }) {
   return prisma.$transaction(async (tx) => {
-    // 1️⃣ создаём заказ
+    // 1️⃣ Создаём заказ
     const order = await tx.order.create({
       data: {
         user_id: userId,
@@ -17,28 +18,30 @@ export async function createOrder({ userId, items }) {
     let total = 0;
     const resultItems = [];
 
-    // 2️⃣ обрабатываем позиции
+    // 2️⃣ Обрабатываем позиции
     for (const item of items) {
       const { productId, quantity } = item;
 
+      // 2.1 Валидация данных позиции
       if (!productId || quantity <= 0) {
-        throw new Error("INVALID_ITEM_DATA");
+        throw createError(400, "INVALID_ITEM_DATA");
       }
 
-      // 3️⃣ берём товар
+      // 2.2 Проверяем существование товара
       const product = await tx.product.findUnique({
         where: { id: productId },
       });
 
       if (!product) {
-        throw new Error(`PRODUCT_NOT_FOUND_${productId}`);
+        throw createError(404, "PRODUCT_NOT_FOUND");
       }
 
+      // 2.3 Проверяем склад
       if (product.in_stock < quantity) {
-        throw new Error(`NOT_ENOUGH_STOCK_${product.title}`);
+        throw createError(409, "NOT_ENOUGH_STOCK");
       }
 
-      // 4️⃣ создаём позицию заказа
+      // 2.4 Создаём позицию заказа
       await tx.orderItem.create({
         data: {
           order_id: order.id,
@@ -47,7 +50,7 @@ export async function createOrder({ userId, items }) {
         },
       });
 
-      // 5️⃣ уменьшаем склад
+      // 2.5 Обновляем склад
       await tx.product.update({
         where: { id: productId },
         data: {
@@ -57,7 +60,7 @@ export async function createOrder({ userId, items }) {
         },
       });
 
-      // 6️⃣ считаем сумму
+      // 2.6 Считаем сумму
       total += Number(product.price) * quantity;
 
       resultItems.push({
@@ -67,7 +70,11 @@ export async function createOrder({ userId, items }) {
         quantity,
       });
     }
-    // 8️⃣ возвращаем осмысленный результат
+
+    // ❗ total НЕ сохраняем в БД
+    // ❗ order.update НЕ нужен
+
+    // 3️⃣ Возвращаем осмысленный результат
     return {
       id: order.id,
       userId: order.user_id,
