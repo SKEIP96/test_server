@@ -10,28 +10,39 @@ datasource db {
 model User {
   id         Int      @id @default(autoincrement())
   name       String
+  email      String   @unique
+  password   String
   created_at DateTime @default(now())
 
-  orders Order[]
+  orders         Order[]
+  refresh_tokens RefreshToken[]
 
   @@map("users")
 }
 
 model Product {
-  id        Int     @id @default(autoincrement())
-  title     String
-  price     Decimal @db.Decimal(10, 2)
-  in_stock  Int     @default(0)
+  id          Int      @id @default(autoincrement())
+  title       String
+  price       Decimal  @db.Decimal(10, 2)
+  in_stock    Int      @default(0)
 
   order_items OrderItem[]
 
   @@map("products")
 }
 
+enum OrderStatus {
+  CART
+  PAID
+  CANCELED
+}
+
 model Order {
-  id         Int      @id @default(autoincrement())
-  user_id    Int
-  created_at DateTime @default(now())
+  id          Int         @id @default(autoincrement())
+  user_id     Int
+  status      OrderStatus @default(CART)
+  created_at  DateTime    @default(now())
+  updated_at  DateTime    @updatedAt
 
   user        User        @relation(fields: [user_id], references: [id], onDelete: Restrict)
   order_items OrderItem[]
@@ -40,14 +51,29 @@ model Order {
 }
 
 model OrderItem {
-  id         Int @id @default(autoincrement())
-  order_id   Int
-  product_id Int
-  quantity   Int
+  id          Int @id @default(autoincrement())
+  order_id    Int
+  product_id  Int
+  quantity    Int
+  price       Decimal  @db.Decimal(10, 2) // NOT NULL
 
-  order   Order   @relation(fields: [order_id], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [product_id], references: [id], onDelete: Restrict)
+  order       Order   @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  product     Product @relation(fields: [product_id], references: [id], onDelete: Restrict)
 
   @@unique([order_id, product_id])
   @@map("order_items")
 }
+
+model RefreshToken {
+  id         Int      @id @default(autoincrement())
+  token      String   @unique
+  user_id    Int
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("refresh_tokens")
+}
+

@@ -1,24 +1,33 @@
-import { createOrder } from "./orders.services.js";
+import { listMyOrders, getMyOrderById } from "./orders.services.js";
 
 /**
- * POST /orders
+ * GET /orders
+ * Orders history (PAID/CANCELED only)
+ * Returns: OrderDto[]
  */
-export async function create(req, res, next) {
+export async function list(req, res, next) {
   try {
-    const { userId, items } = req.body;
+    const userId = req.user.id;
 
-    // Базовая проверка запроса (структура)
-    if (!userId || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({
-        message: "INVALID_REQUEST_DATA",
-      });
-    }
+    const orders = await listMyOrders(userId);
+    res.json(orders);
+  } catch (e) {
+    next(e);
+  }
+}
 
-    const order = await createOrder({ userId, items });
+/**
+ * GET /orders/:id
+ * Returns: OrderDto
+ */
+export async function getById(req, res, next) {
+  try {
+    const userId = req.user.id;
+    const orderId = Number(req.params.id);
 
-    res.status(201).json(order);
-  } catch (err) {
-    // ❗ ВСЕ ошибки уходим в error middleware
-    next(err);
+    const order = await getMyOrderById(userId, orderId);
+    res.json(order);
+  } catch (e) {
+    next(e);
   }
 }
