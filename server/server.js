@@ -8,6 +8,8 @@ import { prisma } from "./src/libs/prisma.js";
 import { startRefreshTokenCleanup } from "./src/cron/cleanupRefreshTokens.js";
 
 const app = express();
+app.set("etag", false);
+
 
 // CORS
 app.use(cors({

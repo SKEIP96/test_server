@@ -6,20 +6,22 @@ import * as productsService from "./products.services.js";
 export async function list(req, res, next) {
   try {
     const take = Math.min(Math.max(Number(req.query.take ?? 12), 1), 50);
-    const cursor = req.query.cursor ? Number(req.query.cursor) : undefined;
-    const q = req.query.q ? String(req.query.q).trim() : "";
-    const sortRaw = String(req.query.sort ?? "new");
-    const sort = ["new", "price_asc", "price_desc", "stock_desc"].includes(sortRaw)
-      ? sortRaw
-      : "new";
+const page = Math.max(Number(req.query.page ?? 1), 1);
+const q = req.query.q ? String(req.query.q).trim() : "";
 
-    const result = await productsService.getPage({ take, cursor, q, sort });
-    res.json(result);
-  } catch (error) {
-    next(error);
+const sortRaw = String(req.query.sort ?? "new");
+const sort = ["new", "price_asc", "price_desc"].includes(sortRaw) ? sortRaw : "new";
+
+const inStockOnly =
+  req.query.inStockOnly === "true" || req.query.inStockOnly === "1";
+
+const result = await productsService.getPage({ take, page, q, sort, inStockOnly });
+res.json(result);
+
+  } catch (e) {
+    next(e);
   }
 }
-
 
 /**
  * GET /products/:id

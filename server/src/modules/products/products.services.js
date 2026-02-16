@@ -54,47 +54,105 @@ function normalizeUpdateInput({ title, price, inStock, in_stock }) {
   return data;
 }
 
-export async function getAll() {
-  const products = await prisma.product.findMany({
-    orderBy: { id: "asc" },
-  });
+export async function getPage({
+  take = 12,
+  page = 1,
+  q = "",
+  sort = "new",
+  inStockOnly = false,
+} = {}) {
+  const takeN = take;   
+  const pageN = page;
+  const skipN = (pageN - 1) * takeN;
 
-  return products.map(toProductDto);
-}
-
-export async function getPage({ take = 12, cursor, q = "", sort = "new" } = {}) {
-  const where =
+  const whereSearch =
     q && q.trim().length > 0
       ? { title: { contains: q.trim(), mode: "insensitive" } }
       : {};
 
-  // стабильная сортировка 
-  const prefix = [{ in_stock: "desc" }];
+  // сортировка внутри блоков (стабильная)
+  let orderBy = [{ id: "desc" }];
+  if (sort === "new") orderBy = [{ id: "desc" }];
+  if (sort === "price_asc") orderBy = [{ price: "asc" }, { id: "asc" }];
+  if (sort === "price_desc") orderBy = [{ price: "desc" }, { id: "desc" }];
 
-// стабильная сортировка + выбранный критерий
-let orderBy = [...prefix, { id: "desc" }];
+  // если включена галочка — просто один блок (только in-stock)
+  if (inStockOnly) {
+    const rows = await prisma.product.findMany({
+      where: { ...whereSearch, in_stock: { gt: 0 } },
+      orderBy,
+      skip: skipN,
+      take: takeN + 1,
+    });
 
-if (sort === "new") orderBy = [...prefix, { id: "desc" }]; // пока нет created_at
-if (sort === "price_asc") orderBy = [...prefix, { price: "asc" }, { id: "asc" }];
-if (sort === "price_desc") orderBy = [...prefix, { price: "desc" }, { id: "desc" }];
-// если ты всё ещё держишь "stock_desc" как сортировку — она по сути совпадает с prefix
-if (sort === "stock_desc") orderBy = [...prefix, { id: "desc" }];
+    const hasMore = rows.length > takeN;
+    const items = hasMore ? rows.slice(0, takeN) : rows;
 
-  const rows = await prisma.product.findMany({
-    where,
-    orderBy,
-    take: take + 1, // берём на 1 больше
-    ...(cursor ? { cursor: { id: Number(cursor) }, skip: 1 } : {}),
+    return { items: items.map(toProductDto), page: pageN, take: takeN, hasMore };
+  }
+
+  // ✅ 2 блока: сначала in-stock, потом out-of-stock
+  const inStockCount = await prisma.product.count({
+    where: { ...whereSearch, in_stock: { gt: 0 } },
   });
 
-  const hasNext = rows.length > take;
-  const pageRows = hasNext ? rows.slice(0, take) : rows;
+  // диапазон элементов, который мы хотим получить: [skipN .. skipN+takeN)
+  const start = skipN;
+  const end = skipN + takeN;
+
+  // сколько берем из in-stock части
+  const inStart = Math.min(start, inStockCount);
+  const inEnd = Math.min(end, inStockCount);
+  const inTake = Math.max(inEnd - inStart, 0);
+
+  // сколько добираем из out-of-stock части
+  const outTake = takeN - inTake;
+  const outSkip = Math.max(start - inStockCount, 0);
+
+  const [inRows, outRows] = await Promise.all([
+    inTake > 0
+      ? prisma.product.findMany({
+          where: { ...whereSearch, in_stock: { gt: 0 } },
+          orderBy,
+          skip: inStart,
+          take: inTake,
+        })
+      : Promise.resolve([]),
+
+    outTake > 0
+      ? prisma.product.findMany({
+          where: { ...whereSearch, in_stock: { lte: 0 } },
+          orderBy,
+          skip: outSkip,
+          take: outTake + 1, // ✅ +1 чтобы понять hasMore на хвосте
+        })
+      : Promise.resolve([]),
+  ]);
+
+  // hasMore: либо есть ещё in-stock дальше, либо есть ещё out-of-stock дальше
+  // Если мы уже залезли в outRows, то hasMore проверяем по outRows length
+  let hasMore = false;
+
+  if (end < inStockCount) {
+    // мы всё ещё внутри in-stock блока
+    hasMore = true;
+  } else {
+    // мы дошли до out-of-stock блока — проверяем, есть ли ещё там
+    hasMore = outRows.length > outTake;
+  }
+
+  const outRowsTrimmed = outRows.length > outTake ? outRows.slice(0, outTake) : outRows;
+  const items = [...inRows, ...outRowsTrimmed];
 
   return {
-    items: pageRows.map(toProductDto),
-    nextCursor: hasNext ? pageRows[pageRows.length - 1]?.id ?? null : null,
+    items: items.map(toProductDto),
+    page: pageN,
+    take: takeN,
+    hasMore,
   };
 }
+
+
 
 
 export async function getById(id) {
