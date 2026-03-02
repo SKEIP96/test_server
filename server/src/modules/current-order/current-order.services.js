@@ -11,6 +11,61 @@ function toNumber(val) {
   return Number(val);
 }
 
+async function normalizeCart(tx, orderId) {
+  const items = await tx.orderItem.findMany({
+    where: { order_id: orderId },
+    orderBy: { id: "asc" },
+    select: {
+      id: true,
+      quantity: true,
+      product_id: true,
+      product: {
+        select: {
+          title: true,
+          in_stock: true,
+        },
+      },
+    },
+  });
+
+  const adjustments = [];
+
+  for (const it of items) {
+    const stock = it.product?.in_stock ?? 0;
+
+    if (stock <= 0) {
+      await tx.orderItem.delete({ where: { id: it.id } });
+
+      adjustments.push({
+        type: "REMOVED",
+        productId: it.product_id,
+        title: it.product?.title ?? "",
+        reason: "Out of stock",
+      });
+
+      continue;
+    }
+
+    if (it.quantity > stock) {
+      await tx.orderItem.update({
+        where: { id: it.id },
+        data: { quantity: stock },
+      });
+
+      adjustments.push({
+        type: "REDUCED",
+        productId: it.product_id,
+        title: it.product?.title ?? "",
+        from: it.quantity,
+        to: stock,
+        reason: `Stock reduced to ${stock}`,
+      });
+    }
+  }
+
+  return adjustments;
+}
+
 function pickUnitPriceForItem(orderStatus, orderItem) {
   // CART: always show current product.price (actual)
   // PAID/CANCELED: show snapshot orderItem.price
@@ -98,6 +153,9 @@ export async function getCurrentOrder(userId) {
   return prisma.$transaction(async (tx) => {
     const current = await getOrCreateCurrentOrder(tx, userId);
 
+    // ✅ ADDED: нормализация корзины прямо перед чтением DTO
+    const adjustments = await normalizeCart(tx, current.id);
+
     const order = await tx.order.findUnique({
       where: { id: current.id },
       select: {
@@ -105,10 +163,10 @@ export async function getCurrentOrder(userId) {
         status: true,
         created_at: true,
         order_items: {
+          orderBy: { id: "asc" }, // ✅ стабильный порядок
           select: {
             id: true,
             quantity: true,
-            // keep snapshot too (not used for CART DTO price, but useful elsewhere)
             price: true,
             product: {
               select: { id: true, title: true, price: true },
@@ -120,10 +178,10 @@ export async function getCurrentOrder(userId) {
 
     if (!order) throw createError(404, "Current order not found");
 
-    return toOrderDto(order);
+    // ✅ CHANGED: возвращаем dto + adjustments
+    return { ...toOrderDto(order), adjustments };
   });
 }
-
 /**
  * Add product to current order (upsert + stock validation)
  * Returns unified Order DTO (current order)
@@ -180,6 +238,7 @@ export async function addItemToCurrentOrder({ userId, productId, quantity = 1 })
         status: true,
         created_at: true,
         order_items: {
+          orderBy: { id: "asc" },
           select: {
             id: true,
             quantity: true,
@@ -244,6 +303,7 @@ export async function setCurrentOrderItemQty({ userId, productId, quantity }) {
         status: true,
         created_at: true,
         order_items: {
+          orderBy: { id: "asc" },
           select: {
             id: true,
             quantity: true,
